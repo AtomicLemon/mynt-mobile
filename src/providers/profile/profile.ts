@@ -102,6 +102,7 @@ export class ProfileProvider {
     timestamp?: string,
     migrating?: boolean
   ): void {
+    if (!keyId) return;
     this.persistenceProvider.setBackupGroupFlag(keyId, timestamp);
     this.logger.debug('Backup flag stored');
     if (!migrating) this.walletsGroups[keyId].needsBackup = false;
@@ -342,8 +343,8 @@ export class ProfileProvider {
     } else if (
       key.use44forMultisig ||
       key.use0forBCH ||
-      !key.compliantDerivation ||
-      key.BIP45
+      key.BIP45 ||
+      key.compliantDerivation === false
     ) {
       return false;
     } else {
@@ -541,16 +542,14 @@ export class ProfileProvider {
     }, delay);
   }
 
-  public storeProfileLegacy(oldProfile): Promise<any> {
-    return this.persistenceProvider
+  public storeProfileLegacy(oldProfile) {
+    this.persistenceProvider
       .storeProfileLegacy(oldProfile)
       .then(() => {
         this.logger.debug('Saved legacy Profile');
-        return Promise.resolve();
       })
       .catch(err => {
         this.logger.error('Could not save legacy Profile', err);
-        return Promise.reject(err);
       });
   }
 
@@ -561,11 +560,11 @@ export class ProfileProvider {
     return this.persistenceProvider
       .storeProfile(this.profile)
       .then(() => {
-        this.logger.debug('Saved modified Profile');
+        this.logger.debug('Saved modified Profile (Dirty)');
         return Promise.resolve();
       })
       .catch(err => {
-        this.logger.error('Could not save Profile(Dirty)', err);
+        this.logger.error('Could not save Profile (Dirty)', err);
         return Promise.reject(err);
       });
   }
@@ -765,6 +764,10 @@ export class ProfileProvider {
         this.onGoingProcessProvider.resume();
         return this.addAndBindWalletClient(data.walletClient, data.key, {
           bwsurl: opts.bwsurl
+        }).then(walletClient => {
+          return this.checkIfAlreadyExist([].concat(walletClient)).then(() => {
+            return Promise.resolve(walletClient);
+          });
         });
       });
     });
@@ -777,27 +780,44 @@ export class ProfileProvider {
       let credentials;
       let key;
       let addressBook;
+      const Key = this.bwcProvider.getKey();
 
       const data = JSON.parse(str);
-
-      try {
-        // needs to migrate?
-        if (data.xPrivKey && data.xPrivKeyEncrypted) {
-          this.logger.warn(
-            'Found both encrypted and decrypted key. Deleting the encrypted version'
+      if (data.credentials) {
+        try {
+          credentials = data.credentials;
+          if (data.key) {
+            key = Key.fromObj(data.key);
+          }
+          addressBook = data.addressBook;
+        } catch (err) {
+          this.logger.error(err);
+          return reject(
+            this.translate.instant('Could not import. Check input file.')
           );
-          delete data.xPrivKeyEncrypted;
-          delete data.mnemonicEncrypted;
         }
-        let migrated = this.bwcProvider.upgradeCredentialsV1(data);
-        credentials = migrated.credentials;
-        key = migrated.key;
-        addressBook = credentials.addressBook ? credentials.addressBook : {};
-      } catch (error) {
-        this.logger.error(error);
-        return reject(
-          this.translate.instant('Could not import. Check input file.')
-        );
+      } else {
+        // old format ? root = credentials.
+        try {
+          // needs to migrate?
+          if (data.xPrivKey && data.xPrivKeyEncrypted) {
+            this.logger.warn(
+              'Found both encrypted and decrypted key. Deleting the encrypted version'
+            );
+            delete data.xPrivKeyEncrypted;
+            delete data.mnemonicEncrypted;
+          }
+
+          let migrated = this.bwcProvider.upgradeCredentialsV1(data);
+          credentials = migrated.credentials;
+          key = migrated.key;
+          addressBook = data.addressBook ? data.addressBook : {};
+        } catch (error) {
+          this.logger.error(error);
+          return reject(
+            this.translate.instant('Could not import. Check input file.')
+          );
+        }
       }
 
       if (!credentials.n) {
@@ -879,7 +899,7 @@ export class ProfileProvider {
         });
 
         return Promise.all(promises).then(() => {
-          this.logger.info(`Bound ${profileLength} wallets`);
+          this.logger.info(`Bound ${profileLength} wallets`);
           return Promise.resolve();
         });
       });
@@ -892,7 +912,8 @@ export class ProfileProvider {
     });
   }
 
-  private async upgradeMultipleCredentials(profile): Promise<any> {
+  private upgradeMultipleCredentials(profile): Promise<any> {
+    const oldProfile = _.clone(profile);
     const migrated = this.bwcProvider.upgradeMultipleCredentialsV1(
       profile.credentials
     );
@@ -902,8 +923,8 @@ export class ProfileProvider {
 
     if (newKeys.length > 0) {
       this.logger.info(`Storing ${newKeys.length} migrated Keys`);
-      await this.storeProfileLegacy(profile);
-
+      this.storeProfileLegacy(oldProfile);
+      if (newKeys.length > 1) this.allowMultiplePrimaryWallets();
       return this.keyProvider.addKeys(newKeys).then(() => {
         profile.credentials = newCrededentials;
         profile.dirty = true;
@@ -912,7 +933,7 @@ export class ProfileProvider {
     } else {
       if (newCrededentials.length > 0) {
         // Only RO wallets.
-        await this.storeProfileLegacy(profile);
+        this.storeProfileLegacy(oldProfile);
 
         profile.credentials = newCrededentials;
         profile.dirty = true;
@@ -920,6 +941,13 @@ export class ProfileProvider {
       }
       return Promise.resolve();
     }
+  }
+
+  public allowMultiplePrimaryWallets(): void {
+    let opts = {
+      allowMultiplePrimaryWallets: true
+    };
+    this.configProvider.set(opts);
   }
 
   public isDisclaimerAccepted(): Promise<any> {
@@ -970,6 +998,18 @@ export class ProfileProvider {
     return this.bindWalletClient(walletClient);
   }
 
+  public getProfileLegacy(): Promise<any> {
+    return this.persistenceProvider.getProfileLegacy().catch(err => {
+      this.logger.info('Error getting old Profile', err);
+    });
+  }
+
+  public removeProfileLegacy(): Promise<any> {
+    return this.persistenceProvider.removeProfileLegacy().catch(err => {
+      this.logger.info('Error getting old Profile', err);
+    });
+  }
+
   public loadAndBindProfile(): Promise<any> {
     return new Promise((resolve, reject) => {
       this.persistenceProvider
@@ -995,6 +1035,43 @@ export class ProfileProvider {
           return reject(err);
         });
     });
+  }
+
+  public importWithDerivationPath(opts): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.logger.info('Importing Wallet with derivation path');
+      this._importWithDerivationPath(opts).then(data => {
+        // Check if wallet exists
+        data.walletClient.openWallet(err => {
+          if (err) {
+            if (err.message.indexOf('not found') > 0) {
+              err = 'WALLET_DOES_NOT_EXIST';
+            }
+            return reject(err);
+          }
+          this.addAndBindWalletClient(data.walletClient, data.key, {
+            bwsurl: opts.bwsurl
+          })
+            .then(walletClient => {
+              this.checkIfAlreadyExist([].concat(walletClient)).then(() => {
+                return resolve(walletClient);
+              });
+            })
+            .catch(err => {
+              return reject(err);
+            });
+        });
+      });
+    });
+  }
+
+  public _importWithDerivationPath(opts): Promise<any> {
+    const showOpts = _.clone(opts);
+    if (showOpts.extendedPrivateKey) showOpts.extendedPrivateKey = '[hidden]';
+    if (showOpts.mnemonic) showOpts.mnemonic = '[hidden]';
+
+    this.logger.debug('Importing Wallet:', JSON.stringify(showOpts));
+    return this.seedWallet(opts);
   }
 
   private seedWallet(opts?): Promise<any> {
@@ -1124,7 +1201,9 @@ export class ProfileProvider {
               err => {
                 const copayerRegistered =
                   err instanceof this.errors.COPAYER_REGISTERED;
-                if (err && !copayerRegistered) {
+                const isSetSeed = opts.mnemonic || opts.extendedPrivateKey;
+
+                if (err && (!copayerRegistered || isSetSeed)) {
                   const msg = this.bwcErrorProvider.msg(
                     err,
                     this.translate.instant('Error creating wallet')
@@ -1423,5 +1502,9 @@ export class ProfileProvider {
       }
     });
     return keyIdIndex >= 0;
+  }
+
+  public isMultiplePrimaryEnabled(): boolean {
+    return !!this.configProvider.get().allowMultiplePrimaryWallets;
   }
 }

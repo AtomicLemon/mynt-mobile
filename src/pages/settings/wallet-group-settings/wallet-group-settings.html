@@ -11,7 +11,7 @@
     </div>
   </label-tip>
 
-  <ion-list class="settings-list">
+  <ion-list class="settings-list bp-list">
 
     <ion-item-divider *ngIf="canSign || touchIdAvailable">{{'Security' | translate}}</ion-item-divider>
     <button ion-item *ngIf="canSign" (click)="openBackupSettings()" [ngClass]="{warn: needsBackup}">
@@ -22,7 +22,7 @@
     </button>
 
     <div *ngIf="canSign">
-      <ion-item class="with-label">
+      <ion-item class="with-label no-border">
         <ion-label>{{'Request Encrypt Password' | translate}}</ion-label>
         <ion-toggle [(ngModel)]="encryptEnabled" (ionChange)="encryptChange()" [disabled]="needsBackup && !encryptEnabled"></ion-toggle>
       </ion-item>
@@ -59,8 +59,8 @@
         <ion-label>
           {{wallet.name}}
         </ion-label>
-        <ion-note item-end>
-          {{ wallet.hidden ? ('Hidden'|translate) : ('Enabled'|translate) }}
+        <ion-note *ngIf="wallet.hidden" item-end>
+          {{'Hidden'|translate}}
         </ion-note>
       </button>
     </ion-list>

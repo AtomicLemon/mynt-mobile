@@ -84,6 +84,8 @@ export class WalletGroupSettingsPage {
   public encryptChange(): void {
     const val = this.encryptEnabled;
 
+    this.profileProvider.removeProfileLegacy();
+
     if (val && !this.walletsGroup.isPrivKeyEncrypted) {
       this.logger.debug('Encrypting private key for', this.walletsGroup.name);
       this.keyProvider
@@ -140,8 +142,7 @@ export class WalletGroupSettingsPage {
 
     if (derivationStrategy == 'BIP45') {
       this.navCtrl.push(WalletExportPage, {
-        walletId: this.wallets[0].credentials.walletId,
-        showNoPrivKeyOpt: true
+        walletId: this.wallets[0].credentials.walletId
       });
     } else {
       this.navCtrl.push(BackupKeyPage, {

@@ -6,7 +6,6 @@ import { Logger } from '../../../providers/logger/logger';
 // providers
 import { ActionSheetProvider } from '../../../providers/action-sheet/action-sheet';
 import { ConfigProvider } from '../../../providers/config/config';
-import { DerivationPathHelperProvider } from '../../../providers/derivation-path-helper/derivation-path-helper';
 import { ExternalLinkProvider } from '../../../providers/external-link/external-link';
 import { KeyProvider } from '../../../providers/key/key';
 import { PersistenceProvider } from '../../../providers/persistence/persistence';
@@ -37,7 +36,6 @@ export class WalletSettingsPage {
   public touchIdEnabled: boolean;
   public touchIdPrevValue: boolean;
   public touchIdAvailable: boolean;
-  public derivationStrategy: string;
   public deleted: boolean = false;
   private config;
 
@@ -53,7 +51,6 @@ export class WalletSettingsPage {
     private translate: TranslateService,
     private actionSheetProvider: ActionSheetProvider,
     private keyProvider: KeyProvider,
-    private derivationPathHelperProvider: DerivationPathHelperProvider,
     private persistenceProvider: PersistenceProvider,
     private events: Events
   ) {
@@ -62,16 +59,13 @@ export class WalletSettingsPage {
   }
 
   ionViewWillEnter() {
-    this.derivationStrategy = this.derivationPathHelperProvider.getDerivationStrategy(
-      this.wallet.credentials.rootPath
-    );
     this.canSign = this.wallet.canSign;
     this.needsBackup = this.wallet.needsBackup;
     this.hiddenBalance = this.wallet.balanceHidden;
     this.encryptEnabled = this.wallet.isPrivKeyEncrypted;
-    this.touchIdProvider.isAvailable().then((isAvailable: boolean) => {
-      this.touchIdAvailable = isAvailable;
-    });
+
+    this.checkBiometricIdAvailable();
+
     this.config = this.configProvider.get();
     this.touchIdEnabled = this.config.touchIdFor
       ? this.config.touchIdFor[this.wallet.credentials.walletId]
@@ -86,6 +80,12 @@ export class WalletSettingsPage {
     }
     this.persistenceProvider.getHiddenFeaturesFlag().then(res => {
       this.showDuplicateWallet = res === 'enabled' ? true : false;
+    });
+  }
+
+  private checkBiometricIdAvailable() {
+    this.touchIdProvider.isAvailable().then((isAvailable: boolean) => {
+      this.touchIdAvailable = isAvailable;
     });
   }
 
@@ -173,6 +173,7 @@ export class WalletSettingsPage {
       })
       .catch(err => {
         this.logger.error('Error with fingerprint:', err);
+        this.checkBiometricIdAvailable();
         this.touchIdEnabled = this.touchIdPrevValue;
       });
   }
@@ -195,8 +196,7 @@ export class WalletSettingsPage {
   }
   public openExportWallet(): void {
     this.navCtrl.push(WalletExportPage, {
-      walletId: this.wallet.credentials.walletId,
-      showNoPrivKeyOpt: false
+      walletId: this.wallet.credentials.walletId
     });
   }
   public openWalletServiceUrl(): void {

@@ -67,6 +67,7 @@ export class HomePage {
   public remainingTimeStr: string;
   public slideDown: boolean;
   public showServerMessage: boolean;
+  public allowMultiplePrimaryWallets: boolean;
 
   public showRateCard: boolean;
   public showPriceChart: boolean;
@@ -371,6 +372,9 @@ export class HomePage {
         'keyId'
       )
     );
+    this.allowMultiplePrimaryWallets =
+      this.profileProvider.isMultiplePrimaryEnabled() ||
+      this.walletsGroups.length > 1;
 
     this.profileProvider.setLastKnownBalance();
 

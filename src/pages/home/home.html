@@ -90,8 +90,7 @@
           Access denied
         </div>
         <div class="server-message-body" translate>
-          Unfortunately, your country/region has banned the use or acceptance of cryptocurrencies as a valid form of
-          payment and we are therefore unable to service you.
+          Unfortunately, your country/region has banned the use or acceptance of cryptocurrencies as a valid form of payment and we are therefore unable to service you.
         </div>
         <div class="server-message-button" (click)="openCountryBannedLink()">
           <span translate>Learn more</span>
@@ -103,9 +102,9 @@
 
     <div *ngFor="let walletGroup of walletsGroups; let i = index" class="wallets-container">
       <ion-list class="sliding-container wallets">
-        <div *ngFor="let wallet of walletGroup">
+        <div *ngFor="let wallet of walletGroup" class="wallet-wrapper">
           <ion-item-sliding #slidingItem>
-            <button ion-item detail-none (click)="onWalletAction(wallet, 'view', slidingItem)">
+            <button [ngStyle]="{'border-color': allowMultiplePrimaryWallets ? '#dae7f8' : '#edeef3'}" ion-item detail-none (click)="onWalletAction(wallet, 'view', slidingItem)">
               <wallet-item-content [wallet]="wallet"></wallet-item-content>
             </button>
             <ion-item-options side="left">
@@ -131,27 +130,31 @@
       </label-tip>
     </div>
 
-    <div class="section-header" *ngIf="readOnlyWalletsGroup && readOnlyWalletsGroup.length > 0" translate>Read Only Wallets</div>
+    <div class="section-header" *ngIf="readOnlyWalletsGroup && readOnlyWalletsGroup.length > 0" translate>
+      Read Only Wallets
+    </div>
 
     <div *ngFor="let readOnlyWallet of readOnlyWalletsGroup; let i = index" class="wallets-container">
       <ion-list class="sliding-container wallets">
-        <ion-item-sliding #slidingItem>
-          <button ion-item detail-none (click)="onWalletAction(readOnlyWallet, 'view', slidingItem)">
-            <wallet-item-content [wallet]="readOnlyWallet"></wallet-item-content>
-          </button>
-          <ion-item-options side="left">
-            <button class="action action--send" ion-button (click)="onWalletAction(readOnlyWallet, 'send', slidingItem)">
-              <div class="action__icon"><img src="assets/img/send.svg" /></div>
-              <div class="action__text">Send</div>
+        <div class="wallet-wrapper">
+          <ion-item-sliding #slidingItem>
+            <button [ngStyle]="{'border-color': allowMultiplePrimaryWallets ? '#dae7f8' : '#edeef3'}" ion-item detail-none (click)="onWalletAction(readOnlyWallet, 'view', slidingItem)">
+              <wallet-item-content [wallet]="readOnlyWallet"></wallet-item-content>
             </button>
-          </ion-item-options>
-          <ion-item-options side="right">
-            <button class="action action--receive" ion-button (click)="onWalletAction(readOnlyWallet, 'receive', slidingItem)">
-              <div class="action__icon"><img src="assets/img/receive.svg" /></div>
-              <div class="action__text">Receive</div>
-            </button>
-          </ion-item-options>
-        </ion-item-sliding>
+            <ion-item-options side="left">
+              <button class="action action--send" ion-button (click)="onWalletAction(readOnlyWallet, 'send', slidingItem)">
+                <div class="action__icon"><img src="assets/img/send.svg" /></div>
+                <div class="action__text">Send</div>
+              </button>
+            </ion-item-options>
+            <ion-item-options side="right">
+              <button class="action action--receive" ion-button (click)="onWalletAction(readOnlyWallet, 'receive', slidingItem)">
+                <div class="action__icon"><img src="assets/img/receive.svg" /></div>
+                <div class="action__text">Receive</div>
+              </button>
+            </ion-item-options>
+          </ion-item-sliding>
+        </div>
       </ion-list>
     </div>
 
@@ -210,7 +213,7 @@
 
   <button *ngIf="wallets && wallets[0]" ion-button ion-fixed class="scan-button" (click)="scan()">
     <ion-avatar item-start> <img src="assets/img/scan.svg" /> </ion-avatar>
-    <div>Scan</div>
+    <div translate>Scan</div>
   </button>
 
 </ion-content>
